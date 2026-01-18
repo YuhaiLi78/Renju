@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 from renju.board import Board, Cell, Point
 from renju.rules import ForbiddenResult, legal_move, winner_for_move, winning_line
@@ -39,13 +41,14 @@ class MoveResult:
 
 
 class Game:
-    def __init__(self, size: int = 15, history_path: str | Path = "history.log") -> None:
+    def __init__(self, size: int = 15, history_dir: str | Path = "history") -> None:
         self.board = Board(size=size)
         self.current_player = Player.ONE
         self.status = GameStatus.PLAYING
         self.history: List[Move] = []
         self.winning_points: List[Point] = []
-        self.history_path = Path(history_path)
+        self.history_dir = Path(history_dir)
+        self.history_path = self._new_history_path()
         self.history_saved = False
         self.last_forbidden: Optional[tuple[Point, str]] = None
         self.player_colors: Dict[Player, Cell] = {
@@ -65,6 +68,7 @@ class Game:
         self.history.clear()
         self.winning_points.clear()
         self.last_forbidden = None
+        self.history_path = self._new_history_path()
         self.history_saved = False
         self.player_colors = {
             Player.ONE: Cell.BLACK,
@@ -248,6 +252,12 @@ class Game:
         if self.status != GameStatus.PLAYING and not self.history_saved:
             self.save_history()
 
+    def _new_history_path(self) -> Path:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        unique_id = uuid4().hex
+        filename = f"history_{timestamp}_{unique_id}.log"
+        return self.history_dir / filename
+
     def save_history(self) -> None:
         if self.history_saved:
             return
@@ -270,6 +280,6 @@ class Game:
 
         content = "\n".join(summary_lines) + "\n" + ("-" * 40) + "\n"
         self.history_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.history_path.open("a", encoding="utf-8") as handle:
+        with self.history_path.open("w", encoding="utf-8") as handle:
             handle.write(content)
         self.history_saved = True

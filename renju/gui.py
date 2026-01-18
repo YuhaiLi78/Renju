@@ -115,9 +115,11 @@ class RenjuGUI:
                 self.status_var.set("Game over: Draw.")
             if self.game.winning_points:
                 coords = ", ".join(f"({pt.row + 1},{pt.col + 1})" for pt in self.game.winning_points)
-                self.detail_var.set(f"Winning line: {coords} | History saved to history.log.")
+                self.detail_var.set(
+                    f"Winning line: {coords} | History saved to {self.game.history_path}."
+                )
             else:
-                self.detail_var.set("History saved to history.log.")
+                self.detail_var.set(f"History saved to {self.game.history_path}.")
             return
 
         current_cell = self.game.current_cell().value
