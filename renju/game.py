@@ -46,6 +46,7 @@ class Game:
         self.history: List[Move] = []
         self.winning_points: List[Point] = []
         self.history_path = Path(history_path)
+        self.history_saved = False
         self.last_forbidden: Optional[tuple[Point, str]] = None
         self.player_colors: Dict[Player, Cell] = {
             Player.ONE: Cell.BLACK,
@@ -64,6 +65,7 @@ class Game:
         self.history.clear()
         self.winning_points.clear()
         self.last_forbidden = None
+        self.history_saved = False
         self.player_colors = {
             Player.ONE: Cell.BLACK,
             Player.TWO: Cell.WHITE,
@@ -129,6 +131,7 @@ class Game:
             self.board.place(point, Cell.EMPTY)
             self.status = GameStatus.WHITE_WON
             self.last_forbidden = (point, forbidden.reason or "forbidden")
+            self._finalize_if_complete()
             return MoveResult(
                 False,
                 self.status,
@@ -171,10 +174,12 @@ class Game:
         if winner_for_move(self.board, remaining, cell):
             self.winning_points = list(winning_line(self.board, remaining, cell))
             self.status = GameStatus.BLACK_WON if cell == Cell.BLACK else GameStatus.WHITE_WON
+            self._finalize_if_complete()
             return MoveResult(True, self.status, f"{cell.value} wins!")
 
         if not any(True for _ in self.board.empty_points()):
             self.status = GameStatus.DRAW
+            self._finalize_if_complete()
             return MoveResult(True, self.status, "Game ended in a draw.")
 
         return MoveResult(True, self.status, "Candidate removed. White to move.")
@@ -213,6 +218,7 @@ class Game:
             self.board.place(point, Cell.EMPTY)
             self.status = GameStatus.WHITE_WON
             self.last_forbidden = (point, forbidden.reason or "forbidden")
+            self._finalize_if_complete()
             return MoveResult(
                 False,
                 self.status,
@@ -225,10 +231,12 @@ class Game:
         if winner_for_move(self.board, point, cell):
             self.winning_points = list(winning_line(self.board, point, cell))
             self.status = GameStatus.BLACK_WON if cell == Cell.BLACK else GameStatus.WHITE_WON
+            self._finalize_if_complete()
             return MoveResult(True, self.status, f"{cell.value} wins!")
 
         if not any(True for _ in self.board.empty_points()):
             self.status = GameStatus.DRAW
+            self._finalize_if_complete()
             return MoveResult(True, self.status, "Game ended in a draw.")
 
         self.switch_player()
@@ -236,7 +244,13 @@ class Game:
             self.swap_available = True
         return MoveResult(True, self.status, "Move accepted.")
 
+    def _finalize_if_complete(self) -> None:
+        if self.status != GameStatus.PLAYING and not self.history_saved:
+            self.save_history()
+
     def save_history(self) -> None:
+        if self.history_saved:
+            return
         moves = []
         for move in self.history:
             moves.append(
@@ -258,3 +272,4 @@ class Game:
         self.history_path.parent.mkdir(parents=True, exist_ok=True)
         with self.history_path.open("a", encoding="utf-8") as handle:
             handle.write(content)
+        self.history_saved = True
