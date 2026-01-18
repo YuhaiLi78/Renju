@@ -57,9 +57,12 @@ class Game:
         }
         self.swap_available = False
         self.swap_decided = False
+        self.swap_chosen: Optional[bool] = None
         self.candidate_points: List[Point] = []
         self.candidate_removal_required = False
         self.candidate_player: Optional[Player] = None
+        self.candidate_pair: Optional[tuple[Point, Point]] = None
+        self.candidate_kept: Optional[Point] = None
 
     def reset(self) -> None:
         self.board = Board(size=self.board.size)
@@ -76,9 +79,12 @@ class Game:
         }
         self.swap_available = False
         self.swap_decided = False
+        self.swap_chosen = None
         self.candidate_points.clear()
         self.candidate_removal_required = False
         self.candidate_player = None
+        self.candidate_pair = None
+        self.candidate_kept = None
 
     def switch_player(self) -> None:
         self.current_player = self.other_player(self.current_player)
@@ -96,6 +102,7 @@ class Game:
             return "Only the white player can decide whether to swap."
         self.swap_decided = True
         self.swap_available = False
+        self.swap_chosen = swap
         if swap:
             self.player_colors[Player.ONE], self.player_colors[Player.TWO] = (
                 self.player_colors[Player.TWO],
@@ -155,6 +162,7 @@ class Game:
         if len(self.candidate_points) < 2:
             return MoveResult(True, self.status, "First candidate placed. Place a second.")
 
+        self.candidate_pair = (self.candidate_points[0], self.candidate_points[1])
         self.candidate_removal_required = True
         self.switch_player()
         return MoveResult(
@@ -172,6 +180,9 @@ class Game:
 
         self.board.place(point, Cell.EMPTY)
         remaining = next(pt for pt in self.candidate_points if pt != point)
+        if self.candidate_pair is None and len(self.candidate_points) == 2:
+            self.candidate_pair = (self.candidate_points[0], self.candidate_points[1])
+        self.candidate_kept = remaining
         candidate_player = self.candidate_player
         self.candidate_points.clear()
         self.candidate_removal_required = False
@@ -284,6 +295,21 @@ class Game:
             point, reason = self.last_forbidden
             summary_lines.append(
                 f"Forbidden: B({point.row + 1},{point.col + 1}) {reason}"
+            )
+
+        if self.swap_chosen is not None:
+            summary_lines.append(
+                "Swap: " + ("colors swapped" if self.swap_chosen else "colors unchanged")
+            )
+
+        if self.candidate_pair and self.candidate_kept:
+            first, second = self.candidate_pair
+            kept = self.candidate_kept
+            summary_lines.append(
+                "Candidates: "
+                f"({first.row + 1},{first.col + 1}) "
+                f"({second.row + 1},{second.col + 1}) "
+                f"kept ({kept.row + 1},{kept.col + 1})"
             )
 
         content = "\n".join(summary_lines) + "\n" + ("-" * 40) + "\n"
