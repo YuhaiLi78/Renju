@@ -101,8 +101,16 @@ class Game:
                 self.player_colors[Player.TWO],
                 self.player_colors[Player.ONE],
             )
+            self.current_player = self._player_for_cell(Cell.WHITE)
             return "Colors swapped."
+        self.current_player = self._player_for_cell(Cell.WHITE)
         return "Colors unchanged."
+
+    def _player_for_cell(self, cell: Cell) -> Player:
+        for player, player_cell in self.player_colors.items():
+            if player_cell == cell:
+                return player
+        raise ValueError(f"No player assigned to {cell}.")
 
     def should_start_candidate_phase(self) -> bool:
         return (
