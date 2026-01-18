@@ -9,6 +9,10 @@ Enter moves as: row col (1-15)
 Commands:
   help  Show this message
   quit  Exit the game
+
+Opening rules:
+  After the 3rd move, White may swap colors.
+  On the 5th move, Black places two candidates and White removes one.
 """.strip()
 
 
@@ -40,7 +44,38 @@ def main() -> None:
             print(f"Game history saved to {game.history_path}.")
             break
 
-        prompt = f"{game.current_player.value} to move > "
+        if game.swap_available and not game.swap_decided:
+            swap_input = input("White may swap colors. Swap? (y/n) > ").strip().lower()
+            swap = swap_input in {"y", "yes"}
+            print(game.decide_swap(swap))
+            continue
+
+        if game.candidate_removal_required:
+            user_input = input("White remove one candidate (row col) > ").strip().lower()
+            if user_input in {"quit", "exit"}:
+                print("Goodbye!")
+                break
+            if user_input in {"help", "?"}:
+                print(HELP_TEXT)
+                continue
+
+            point = parse_move(user_input)
+            if point is None:
+                print("Invalid input. Type 'help' for instructions.")
+                continue
+
+            result = game.remove_candidate(point)
+            print(result.message)
+            if result.status == GameStatus.ILLEGAL_MOVE:
+                game.status = GameStatus.PLAYING
+            continue
+
+        current_cell = game.current_cell().value
+        candidate_note = ""
+        if game.should_start_candidate_phase() or game.candidate_points:
+            candidate_number = len(game.candidate_points) + 1
+            candidate_note = f" (candidate {candidate_number} of 2)"
+        prompt = f"{game.current_player.value} [{current_cell}] to move{candidate_note} > "
         user_input = input(prompt).strip().lower()
         if user_input in {"quit", "exit"}:
             print("Goodbye!")
