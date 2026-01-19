@@ -280,39 +280,44 @@ class Game:
     def save_history(self) -> None:
         if self.history_saved:
             return
-        moves = []
-        for move in self.history:
-            moves.append(
-                f"{move.player.value}-{move.cell.value}({move.point.row + 1},{move.point.col + 1})"
-            )
-
         summary_lines = [
-            f"Result: {self.status.value}",
-            f"Moves: {' '.join(moves) if moves else 'none'}",
+            "RENJU_HISTORY_v1",
+            f"RESULT|{self.status.value}",
+            f"TOTAL_MOVES|{len(self.history)}",
         ]
+
+        for index, move in enumerate(self.history, start=1):
+            summary_lines.append(
+                "MOVE|"
+                f"{index}|{move.player.value}|{move.cell.value}|"
+                f"{move.point.row + 1},{move.point.col + 1}"
+            )
 
         if self.last_forbidden:
             point, reason = self.last_forbidden
             summary_lines.append(
-                f"Forbidden: B({point.row + 1},{point.col + 1}) {reason}"
+                "FORBIDDEN|B|"
+                f"{point.row + 1},{point.col + 1}|{reason}"
             )
 
         if self.swap_chosen is not None:
             summary_lines.append(
-                "Swap: " + ("colors swapped" if self.swap_chosen else "colors unchanged")
+                "SWAP|"
+                + ("colors swapped" if self.swap_chosen else "colors unchanged")
             )
 
         if self.candidate_pair and self.candidate_kept:
             first, second = self.candidate_pair
             kept = self.candidate_kept
             summary_lines.append(
-                "Candidates: "
-                f"({first.row + 1},{first.col + 1}) "
-                f"({second.row + 1},{second.col + 1}) "
-                f"kept ({kept.row + 1},{kept.col + 1})"
+                "CANDIDATES|"
+                f"{first.row + 1},{first.col + 1}|"
+                f"{second.row + 1},{second.col + 1}|"
+                f"KEPT|{kept.row + 1},{kept.col + 1}"
             )
 
-        content = "\n".join(summary_lines) + "\n" + ("-" * 40) + "\n"
+        summary_lines.append("END")
+        content = "\n".join(summary_lines) + "\n"
         self.history_path.parent.mkdir(parents=True, exist_ok=True)
         with self.history_path.open("w", encoding="utf-8") as handle:
             handle.write(content)
