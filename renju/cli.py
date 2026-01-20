@@ -2,23 +2,30 @@ from __future__ import annotations
 
 from renju.board import Point
 from renju.game import Game, GameStatus
-from renju.rules import RuleSet
+from renju.rules import RuleSet, rules_catalog
 
 
-HELP_TEXT = """
-Enter moves as: row col (1-15)
-Commands:
-  help  Show this message
-  quit  Exit the game
+def rules_help_text() -> str:
+    lines = ["Rule sets:"]
+    for info in rules_catalog():
+        lines.append(f"  {info.ruleset.value:<9} {info.description}")
+    return "\n".join(lines)
 
-Rule sets:
-  renju     Standard Renju rules (Black restrictions apply).
-  freestyle No Black restrictions; 5 or more in a row wins.
 
-Opening rules (Renju only):
-  After the 3rd move, White may swap colors.
-  On the 5th move, Black places two candidates and White removes one.
-""".strip()
+HELP_TEXT = "\n".join(
+    [
+        "Enter moves as: row col (1-15)",
+        "Commands:",
+        "  help  Show this message",
+        "  quit  Exit the game",
+        "",
+        rules_help_text(),
+        "",
+        "Opening rules (Renju only):",
+        "  After the 3rd move, White may swap colors.",
+        "  On the 5th move, Black places two candidates and White removes one.",
+    ]
+)
 
 
 def parse_move(text: str) -> Point | None:
@@ -31,10 +38,25 @@ def parse_move(text: str) -> Point | None:
     return Point(row=row, col=col)
 
 
+def select_ruleset() -> RuleSet:
+    catalog = rules_catalog()
+    print("Select ruleset:")
+    for idx, info in enumerate(catalog, start=1):
+        print(f"  {idx}. {info.label} ({info.ruleset.value}) - {info.description}")
+
+    while True:
+        choice = input(f"Enter choice [1-{len(catalog)}] (default 1) > ").strip()
+        if not choice:
+            return catalog[0].ruleset
+        if choice.isdigit():
+            index = int(choice)
+            if 1 <= index <= len(catalog):
+                return catalog[index - 1].ruleset
+        print("Invalid selection. Choose a number from the list.")
+
+
 def main() -> None:
-    rule_input = input("Choose ruleset (renju/freestyle) [renju] > ").strip().lower()
-    ruleset = RuleSet.FREESTYLE if rule_input == "freestyle" else RuleSet.RENJU
-    game = Game(ruleset=ruleset)
+    game = Game(ruleset=select_ruleset())
     print("Renju")
     print(HELP_TEXT)
 

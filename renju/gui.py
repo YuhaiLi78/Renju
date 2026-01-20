@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 
 from renju.board import Cell, Point
 from renju.game import Game, GameStatus, Player
-from renju.rules import RuleSet
+from renju.rules import RuleSet, rule_info, rules_catalog
 
 
 class RenjuGUI:
@@ -27,14 +27,54 @@ class RenjuGUI:
         self._refresh_ui()
 
     def _choose_ruleset(self) -> RuleSet:
-        choice = simpledialog.askstring(
-            "Choose Ruleset",
-            "Select ruleset: renju or freestyle",
-            parent=self.root,
-        )
-        if choice and choice.strip().lower() == "freestyle":
-            return RuleSet.FREESTYLE
-        return RuleSet.RENJU
+        catalog = rules_catalog()
+        selection: dict[str, RuleSet] = {"ruleset": catalog[0].ruleset}
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Choose Ruleset")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        prompt = tk.Label(dialog, text="Select ruleset:")
+        prompt.pack(anchor="w", padx=12, pady=(12, 4))
+
+        listbox = tk.Listbox(dialog, height=len(catalog), exportselection=False)
+        for info in catalog:
+            listbox.insert(tk.END, f"{info.label} ({info.ruleset.value})")
+        listbox.selection_set(0)
+        listbox.pack(fill=tk.X, padx=12)
+
+        description_var = tk.StringVar(value=catalog[0].description)
+        description_label = tk.Label(dialog, textvariable=description_var, wraplength=280, justify="left")
+        description_label.pack(fill=tk.X, padx=12, pady=(6, 10))
+
+        def update_description(_: tk.Event) -> None:
+            index = listbox.curselection()
+            if index:
+                description_var.set(catalog[index[0]].description)
+
+        def confirm() -> None:
+            index = listbox.curselection()
+            if index:
+                selection["ruleset"] = catalog[index[0]].ruleset
+            dialog.destroy()
+
+        def cancel() -> None:
+            dialog.destroy()
+
+        listbox.bind("<<ListboxSelect>>", update_description)
+
+        button_frame = tk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=12, pady=(0, 12))
+
+        ok_button = tk.Button(button_frame, text="OK", command=confirm)
+        ok_button.pack(side=tk.RIGHT)
+
+        cancel_button = tk.Button(button_frame, text="Cancel", command=cancel)
+        cancel_button.pack(side=tk.RIGHT, padx=(0, 6))
+
+        dialog.wait_window()
+        return selection["ruleset"]
 
     def _build_layout(self) -> None:
         status_frame = tk.Frame(self.root, padx=10, pady=8)
@@ -152,7 +192,7 @@ class RenjuGUI:
             candidate_number = len(self.game.candidate_points) + 1
             detail_parts.append(f"Black to place candidate {candidate_number} of 2.")
 
-        detail_parts.append(f"Ruleset: {self.game.ruleset.value}.")
+        detail_parts.append(f"Ruleset: {rule_info(self.game.ruleset).label}.")
         self.detail_var.set(" ".join(detail_parts))
 
     def _update_controls(self) -> None:
