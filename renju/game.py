@@ -289,7 +289,7 @@ class Game:
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         unique_id = uuid4().hex
         filename = f"history_{timestamp}_{unique_id}.log"
-        return self.history_dir / filename
+        return self.history_dir / self.ruleset.value / filename
 
     def save_history(self) -> None:
         if self.history_saved:

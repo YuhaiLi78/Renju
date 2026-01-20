@@ -31,6 +31,38 @@ class RuleSet(str, Enum):
     FREESTYLE = "freestyle"
 
 
+@dataclass(frozen=True)
+class RuleInfo:
+    ruleset: RuleSet
+    label: str
+    description: str
+
+
+RULES_CATALOG: tuple[RuleInfo, ...] = (
+    RuleInfo(
+        ruleset=RuleSet.RENJU,
+        label="Renju",
+        description="Standard Renju rules (Black restrictions apply).",
+    ),
+    RuleInfo(
+        ruleset=RuleSet.FREESTYLE,
+        label="Freestyle",
+        description="No Black restrictions; 5 or more in a row wins.",
+    ),
+)
+
+
+def rules_catalog() -> tuple[RuleInfo, ...]:
+    return RULES_CATALOG
+
+
+def rule_info(ruleset: RuleSet) -> RuleInfo:
+    for info in RULES_CATALOG:
+        if info.ruleset == ruleset:
+            return info
+    raise ValueError(f"No metadata for ruleset {ruleset}.")
+
+
 def line_from_point(board: Board, point: Point, dr: int, dc: int, cell: Cell) -> LineResult:
     points: List[Point] = [point]
     length = 1
