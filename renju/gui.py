@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 from renju.board import Cell, Point
 from renju.game import Game, GameStatus, Player
+from renju.rules import RuleSet
 
 
 class RenjuGUI:
     def __init__(self, root: tk.Tk, size: int = 15) -> None:
         self.root = root
         self.root.title("Renju")
-        self.game = Game(size=size)
+        self.game = Game(size=size, ruleset=self._choose_ruleset())
         self.size = size
         self.margin = 30
         self.cell_size = 32
@@ -24,6 +25,16 @@ class RenjuGUI:
         self._build_layout()
         self._draw_board()
         self._refresh_ui()
+
+    def _choose_ruleset(self) -> RuleSet:
+        choice = simpledialog.askstring(
+            "Choose Ruleset",
+            "Select ruleset: renju or freestyle",
+            parent=self.root,
+        )
+        if choice and choice.strip().lower() == "freestyle":
+            return RuleSet.FREESTYLE
+        return RuleSet.RENJU
 
     def _build_layout(self) -> None:
         status_frame = tk.Frame(self.root, padx=10, pady=8)
@@ -130,19 +141,24 @@ class RenjuGUI:
             f"Player 2: {self.game.player_colors[Player.TWO].value}",
         ]
 
-        if self.game.swap_available and not self.game.swap_decided:
+        if self.game.ruleset == RuleSet.RENJU and self.game.swap_available and not self.game.swap_decided:
             detail_parts.append("White may swap colors after the third move.")
 
-        if self.game.candidate_removal_required:
+        if self.game.ruleset == RuleSet.RENJU and self.game.candidate_removal_required:
             detail_parts.append("White must remove one candidate move.")
-        elif self.game.should_start_candidate_phase() or self.game.candidate_points:
+        elif self.game.ruleset == RuleSet.RENJU and (
+            self.game.should_start_candidate_phase() or self.game.candidate_points
+        ):
             candidate_number = len(self.game.candidate_points) + 1
             detail_parts.append(f"Black to place candidate {candidate_number} of 2.")
 
+        detail_parts.append(f"Ruleset: {self.game.ruleset.value}.")
         self.detail_var.set(" ".join(detail_parts))
 
     def _update_controls(self) -> None:
-        swap_active = self.game.swap_available and not self.game.swap_decided
+        swap_active = (
+            self.game.ruleset == RuleSet.RENJU and self.game.swap_available and not self.game.swap_decided
+        )
         state = tk.NORMAL if swap_active and self.game.status == GameStatus.PLAYING else tk.DISABLED
         self.swap_yes_button.configure(state=state)
         self.swap_no_button.configure(state=state)
@@ -152,7 +168,7 @@ class RenjuGUI:
             self.message_var.set("Game is over. Start a new game to play again.")
             return
 
-        if self.game.swap_available and not self.game.swap_decided:
+        if self.game.ruleset == RuleSet.RENJU and self.game.swap_available and not self.game.swap_decided:
             self.message_var.set("White must decide whether to swap colors.")
             return
 
@@ -160,7 +176,7 @@ class RenjuGUI:
         if point is None:
             return
 
-        if self.game.candidate_removal_required:
+        if self.game.ruleset == RuleSet.RENJU and self.game.candidate_removal_required:
             result = self.game.remove_candidate(point)
         else:
             result = self.game.place_move(point)
@@ -184,7 +200,8 @@ class RenjuGUI:
             )
             if not proceed:
                 return
-        self.game.reset()
+        ruleset = self._choose_ruleset()
+        self.game.reset(ruleset=ruleset)
         self.message_var.set("New game started.")
         self._refresh_ui()
 

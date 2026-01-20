@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Iterable, List, Sequence
 
 from renju.board import Board, Cell, Point
@@ -23,6 +24,11 @@ class LineResult:
 class ForbiddenResult:
     is_forbidden: bool
     reason: str | None = None
+
+
+class RuleSet(str, Enum):
+    RENJU = "renju"
+    FREESTYLE = "freestyle"
 
 
 def line_from_point(board: Board, point: Point, dr: int, dc: int, cell: Cell) -> LineResult:
@@ -59,8 +65,10 @@ def longest_line(board: Board, point: Point, cell: Cell) -> LineResult:
     return best
 
 
-def winner_for_move(board: Board, point: Point, cell: Cell) -> bool:
+def winner_for_move(board: Board, point: Point, cell: Cell, ruleset: RuleSet) -> bool:
     line = longest_line(board, point, cell)
+    if ruleset == RuleSet.FREESTYLE:
+        return line.length >= 5
     if cell == Cell.WHITE:
         return line.length >= 5
     return line.length == 5
@@ -128,16 +136,21 @@ def forbidden_move(board: Board, point: Point) -> ForbiddenResult:
     return ForbiddenResult(is_forbidden=False, reason=None)
 
 
-def legal_move(board: Board, point: Point, cell: Cell) -> ForbiddenResult:
+def legal_move(board: Board, point: Point, cell: Cell, ruleset: RuleSet) -> ForbiddenResult:
+    if ruleset == RuleSet.FREESTYLE:
+        return ForbiddenResult(is_forbidden=False, reason=None)
     if cell == Cell.WHITE:
         return ForbiddenResult(is_forbidden=False, reason=None)
     return forbidden_move(board, point)
 
 
-def winning_line(board: Board, point: Point, cell: Cell) -> Iterable[Point]:
+def winning_line(board: Board, point: Point, cell: Cell, ruleset: RuleSet) -> Iterable[Point]:
     line = longest_line(board, point, cell)
-    if cell == Cell.WHITE and line.length >= 5:
+    if ruleset == RuleSet.FREESTYLE and line.length >= 5:
         return line.points
-    if cell == Cell.BLACK and line.length == 5:
-        return line.points
+    if ruleset == RuleSet.RENJU:
+        if cell == Cell.WHITE and line.length >= 5:
+            return line.points
+        if cell == Cell.BLACK and line.length == 5:
+            return line.points
     return []

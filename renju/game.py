@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 from uuid import uuid4
 
 from renju.board import Board, Cell, Point
-from renju.rules import ForbiddenResult, legal_move, winner_for_move, winning_line
+from renju.rules import ForbiddenResult, RuleSet, legal_move, winner_for_move, winning_line
 
 
 class GameStatus(str, Enum):
@@ -41,13 +41,19 @@ class MoveResult:
 
 
 class Game:
-    def __init__(self, size: int = 15, history_dir: str | Path = "history") -> None:
+    def __init__(
+        self,
+        size: int = 15,
+        history_dir: str | Path = "history",
+        ruleset: RuleSet = RuleSet.RENJU,
+    ) -> None:
         self.board = Board(size=size)
         self.current_player = Player.ONE
         self.status = GameStatus.PLAYING
         self.history: List[Move] = []
         self.winning_points: List[Point] = []
         self.history_dir = Path(history_dir)
+        self.ruleset = ruleset
         self.history_path = self._new_history_path()
         self.history_saved = False
         self.last_forbidden: Optional[tuple[Point, str]] = None
@@ -64,13 +70,15 @@ class Game:
         self.candidate_pair: Optional[tuple[Point, Point]] = None
         self.candidate_kept: Optional[Point] = None
 
-    def reset(self) -> None:
+    def reset(self, ruleset: RuleSet | None = None) -> None:
         self.board = Board(size=self.board.size)
         self.current_player = Player.ONE
         self.status = GameStatus.PLAYING
         self.history.clear()
         self.winning_points.clear()
         self.last_forbidden = None
+        if ruleset is not None:
+            self.ruleset = ruleset
         self.history_path = self._new_history_path()
         self.history_saved = False
         self.player_colors = {
@@ -96,6 +104,8 @@ class Game:
         return self.player_colors[self.current_player]
 
     def decide_swap(self, swap: bool) -> str:
+        if self.ruleset != RuleSet.RENJU:
+            return "Swap is only available in Renju rules."
         if not self.swap_available or self.swap_decided:
             return "Swap decision is not available."
         if self.current_cell() != Cell.WHITE:
@@ -120,6 +130,8 @@ class Game:
         raise ValueError(f"No player assigned to {cell}.")
 
     def should_start_candidate_phase(self) -> bool:
+        if self.ruleset != RuleSet.RENJU:
+            return False
         return (
             len(self.history) == 4
             and self.current_cell() == Cell.BLACK
@@ -145,7 +157,7 @@ class Game:
             return MoveResult(False, self.status, "Intersection is already occupied.")
 
         self.board.place(point, self.current_cell())
-        forbidden = legal_move(self.board, point, self.current_cell())
+        forbidden = legal_move(self.board, point, self.current_cell(), self.ruleset)
         if forbidden.is_forbidden:
             self.board.place(point, Cell.EMPTY)
             self.status = GameStatus.WHITE_WON
@@ -194,8 +206,8 @@ class Game:
         cell = self.player_colors[candidate_player]
         self.history.append(Move(player=candidate_player, cell=cell, point=remaining))
 
-        if winner_for_move(self.board, remaining, cell):
-            self.winning_points = list(winning_line(self.board, remaining, cell))
+        if winner_for_move(self.board, remaining, cell, self.ruleset):
+            self.winning_points = list(winning_line(self.board, remaining, cell, self.ruleset))
             self.status = GameStatus.BLACK_WON if cell == Cell.BLACK else GameStatus.WHITE_WON
             self._finalize_if_complete()
             return MoveResult(True, self.status, f"{cell.value} wins!")
@@ -211,17 +223,19 @@ class Game:
         if self.status != GameStatus.PLAYING:
             return MoveResult(False, self.status, "Game is already over.")
 
-        if self.swap_available and not self.swap_decided:
+        if self.ruleset == RuleSet.RENJU and self.swap_available and not self.swap_decided:
             return MoveResult(
                 False,
                 self.status,
                 "White must decide whether to swap colors before continuing.",
             )
 
-        if self.should_start_candidate_phase() or self.candidate_points:
+        if self.should_start_candidate_phase() or (
+            self.ruleset == RuleSet.RENJU and self.candidate_points
+        ):
             return self.place_candidate(point)
 
-        if self.candidate_removal_required:
+        if self.ruleset == RuleSet.RENJU and self.candidate_removal_required:
             return MoveResult(
                 False,
                 self.status,
@@ -236,7 +250,7 @@ class Game:
 
         cell = self.current_cell()
         self.board.place(point, cell)
-        forbidden = legal_move(self.board, point, cell)
+        forbidden = legal_move(self.board, point, cell, self.ruleset)
         if forbidden.is_forbidden:
             self.board.place(point, Cell.EMPTY)
             self.status = GameStatus.WHITE_WON
@@ -251,8 +265,8 @@ class Game:
 
         self.history.append(Move(player=self.current_player, cell=cell, point=point))
 
-        if winner_for_move(self.board, point, cell):
-            self.winning_points = list(winning_line(self.board, point, cell))
+        if winner_for_move(self.board, point, cell, self.ruleset):
+            self.winning_points = list(winning_line(self.board, point, cell, self.ruleset))
             self.status = GameStatus.BLACK_WON if cell == Cell.BLACK else GameStatus.WHITE_WON
             self._finalize_if_complete()
             return MoveResult(True, self.status, f"{cell.value} wins!")
@@ -263,7 +277,7 @@ class Game:
             return MoveResult(True, self.status, "Game ended in a draw.")
 
         self.switch_player()
-        if len(self.history) == 3 and not self.swap_decided:
+        if self.ruleset == RuleSet.RENJU and len(self.history) == 3 and not self.swap_decided:
             self.swap_available = True
         return MoveResult(True, self.status, "Move accepted.")
 
